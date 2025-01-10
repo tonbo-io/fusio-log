@@ -14,7 +14,7 @@ use futures_util::stream;
 pub use option::*;
 pub use serdes::*;
 
-pub struct Logger<T: Encode + Decode> {
+pub struct Logger<T> {
     path: Path,
     fs: Arc<dyn DynFs>,
     buf_writer: BufWriter<Box<dyn DynFile>>,
@@ -43,13 +43,13 @@ where
 
     pub(crate) async fn with_fs(fs: Arc<dyn DynFs>, option: Options) -> Result<Self, LogError> {
         let file = fs
-            .open_options(&option.path, OpenOptions::default().create(true))
+            .open_options(&option.path, OpenOptions::default().create(true).read(true))
             .await
             .map_err(parse_fusio_error)?;
 
         let buf_writer = BufWriter::new(file, option.buf_size);
         Ok(Self {
-            fs,
+            fs: fs.clone(),
             buf_writer,
             path: option.path,
             _mark: PhantomData,
@@ -94,16 +94,40 @@ where
         Ok(())
     }
 
+    pub async fn flush(&mut self) -> Result<(), LogError> {
+        self.buf_writer.flush().await.map_err(parse_fusio_error)?;
+        Ok(())
+    }
+
+    pub async fn close(&mut self) -> Result<(), LogError> {
+        self.buf_writer.close().await.map_err(parse_fusio_error)?;
+        Ok(())
+    }
+
+    /// Remove log file
+    pub async fn remove(self) -> Result<(), LogError> {
+        self.fs
+            .remove(&self.path)
+            .await
+            .map_err(parse_fusio_error)?;
+        Ok(())
+    }
+}
+
+impl<T> Logger<T>
+where
+    T: Decode,
+{
     pub(crate) async fn recover(
         option: Options,
-    ) -> Result<impl TryStream<Ok = Vec<T>, Error = LogError>, LogError> {
+    ) -> Result<impl TryStream<Ok = Vec<T>, Error = LogError> + Unpin, LogError> {
         let fs = option.fs_option.parse().map_err(parse_fusio_error)?;
         let file = fs
-            .open_options(&option.path, OpenOptions::default())
+            .open_options(&option.path, OpenOptions::default().create(false))
             .await
             .map_err(parse_fusio_error)?;
 
-        Ok(stream::try_unfold(
+        Ok(Box::pin(stream::try_unfold(
             (file, 0),
             |(mut f, mut pos)| async move {
                 let mut cursor = Cursor::new(&mut f);
@@ -135,26 +159,7 @@ where
 
                 Ok(Some((buf, (f, pos))))
             },
-        ))
-    }
-
-    pub async fn flush(&mut self) -> Result<(), LogError> {
-        self.buf_writer.flush().await.map_err(parse_fusio_error)?;
-        Ok(())
-    }
-
-    pub async fn close(&mut self) -> Result<(), LogError> {
-        self.buf_writer.close().await.map_err(parse_fusio_error)?;
-        Ok(())
-    }
-
-    /// Remove log file
-    pub async fn remove(self) -> Result<(), LogError> {
-        self.fs
-            .remove(&self.path)
-            .await
-            .map_err(parse_fusio_error)?;
-        Ok(())
+        )))
     }
 }
 
@@ -227,7 +232,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = Path::from_filesystem_path(temp_dir.path())
             .unwrap()
-            .child("u8");
+            .child(format!("{}.{}", "01JH8D9PQTE3XP4HPVCFPYP37W", "log"));
+        // .child("u8");
 
         {
             let mut logger = Options::new(path.clone()).build::<u8>().await.unwrap();

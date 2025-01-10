@@ -55,9 +55,11 @@ impl Options {
         Ok(logger)
     }
 
-    pub async fn recover<T>(self) -> Result<impl TryStream<Ok = Vec<T>, Error = LogError>, LogError>
+    pub async fn recover<T>(
+        self,
+    ) -> Result<impl TryStream<Ok = Vec<T>, Error = LogError> + Unpin, LogError>
     where
-        T: Encode + Decode,
+        T: Decode,
     {
         Logger::<T>::recover(self).await
     }
