@@ -6,7 +6,8 @@ use std::{io::Cursor, marker::PhantomData, sync::Arc};
 
 use error::{parse_fusio_error, LogError};
 use fs::hash::{HashReader, HashWriter};
-use fusio::{buffered::BufWriter, dynamic::DynFile, fs::OpenOptions, path::Path, DynFs, DynWrite};
+pub use fusio::path::Path;
+use fusio::{buffered::BufWriter, dynamic::DynFile, fs::OpenOptions, DynFs, DynWrite};
 use futures_core::TryStream;
 use futures_util::stream;
 #[allow(unused)]
