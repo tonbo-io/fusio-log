@@ -23,7 +23,7 @@ pub struct Logger<T> {
 
 impl<T> Logger<T>
 where
-    T: Encode + Decode,
+    T: Encode,
 {
     pub(crate) async fn new(option: Options) -> Result<Self, LogError> {
         let fs = option.fs_option.parse().map_err(parse_fusio_error)?;
@@ -59,7 +59,7 @@ where
 
 impl<T> Logger<T>
 where
-    T: Encode + Decode,
+    T: Encode,
 {
     pub async fn write_batch(
         &mut self,
@@ -103,15 +103,6 @@ where
         self.buf_writer.close().await.map_err(parse_fusio_error)?;
         Ok(())
     }
-
-    /// Remove log file
-    pub async fn remove(self) -> Result<(), LogError> {
-        self.fs
-            .remove(&self.path)
-            .await
-            .map_err(parse_fusio_error)?;
-        Ok(())
-    }
 }
 
 impl<T> Logger<T>
@@ -135,6 +126,7 @@ where
                 let mut reader = HashReader::new(cursor);
 
                 let Ok(len) = u32::decode(&mut reader).await else {
+                    f.close().await?;
                     return Ok(None);
                 };
                 let mut buf = Vec::with_capacity(len as usize);
@@ -160,6 +152,17 @@ where
                 Ok(Some((buf, (f, pos))))
             },
         )))
+    }
+}
+
+impl<T> Logger<T> {
+    /// Remove log file
+    pub async fn remove(self) -> Result<(), LogError> {
+        self.fs
+            .remove(&self.path)
+            .await
+            .map_err(parse_fusio_error)?;
+        Ok(())
     }
 }
 
@@ -365,6 +368,28 @@ mod tests {
                 }
                 i += 1;
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_recover_empty() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = Path::from_filesystem_path(temp_dir.path())
+            .unwrap()
+            .child("empty");
+
+        {
+            let mut logger = Options::new(path.clone())
+                .build::<TestStruct>()
+                .await
+                .unwrap();
+            logger.flush().await.unwrap();
+            logger.close().await.unwrap();
+        }
+        {
+            let mut stream = Options::new(path).recover::<TestStruct>().await.unwrap();
+            let res = stream.try_next().await.unwrap();
+            assert!(res.is_none());
         }
     }
 }

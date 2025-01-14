@@ -41,7 +41,7 @@ impl Options {
 
     pub async fn build<T>(self) -> Result<Logger<T>, LogError>
     where
-        T: Encode + Decode,
+        T: Encode,
     {
         let logger = Logger::<T>::new(self).await?;
         Ok(logger)
@@ -49,7 +49,7 @@ impl Options {
 
     pub async fn build_with_fs<T>(self, fs: Arc<dyn DynFs>) -> Result<Logger<T>, LogError>
     where
-        T: Encode + Decode,
+        T: Encode,
     {
         let logger = Logger::<T>::with_fs(fs, self).await?;
         Ok(logger)
