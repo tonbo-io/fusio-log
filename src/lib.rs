@@ -61,9 +61,9 @@ impl<T> Logger<T>
 where
     T: Encode,
 {
-    pub async fn write_batch(
-        &mut self,
-        data: impl ExactSizeIterator<Item = T>,
+    pub async fn write_batch<'r>(
+        &'r mut self,
+        data: impl ExactSizeIterator<Item = &'r T>,
     ) -> Result<(), LogError> {
         let mut writer = HashWriter::new(&mut self.buf_writer);
         (data.len() as u32)
@@ -235,15 +235,14 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = Path::from_filesystem_path(temp_dir.path())
             .unwrap()
-            .child(format!("{}.{}", "01JH8D9PQTE3XP4HPVCFPYP37W", "log"));
-        // .child("u8");
+            .child("u8");
 
         {
             let mut logger = Options::new(path.clone()).build::<u8>().await.unwrap();
             logger.write(&1).await.unwrap();
-            logger.write_batch([2, 3, 4].into_iter()).await.unwrap();
+            logger.write_batch([2, 3, 4].iter()).await.unwrap();
             logger
-                .write_batch([2, 3, 4, 5, 1, 255].into_iter())
+                .write_batch([2, 3, 4, 5, 1, 255].iter())
                 .await
                 .unwrap();
             logger.flush().await.unwrap();
@@ -286,7 +285,7 @@ mod tests {
                 })
                 .await
                 .unwrap();
-            logger.write_batch(test_items().into_iter()).await.unwrap();
+            logger.write_batch(test_items().iter()).await.unwrap();
             logger.flush().await.unwrap();
             logger.close().await.unwrap();
         }
@@ -344,7 +343,7 @@ mod tests {
                 })
                 .await
                 .unwrap();
-            logger.write_batch(test_items().into_iter()).await.unwrap();
+            logger.write_batch(test_items().iter()).await.unwrap();
             logger.flush().await.unwrap();
             logger.close().await.unwrap();
         }
