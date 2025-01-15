@@ -1,10 +1,24 @@
 
+# Fusio Log
+Fusio-log is an append only log library for Rust. Leveraging [fusio](https://github.com/tonbo-io/fusio), fusio-log supports various backends like disk, wasm, and S3.
+You can use it in various scenarios that, such as [write-ahead logging](https://en.wikipedia.org/wiki/Write-ahead_logging), [manifest file](https://en.wikipedia.org/wiki/Manifest_file), distributed log.
+
 
 ## Usage
 
+1. Define data structure.
 ```rust
-use fusio_log::Path;
+struct User {
+    id: u64,
+    name: String,
+    email: Option<String>,
+}
+```
 
+2. Implement `Encode` and `Decode` trait for it
+3. Start to use fusio-log
+
+```rust
 #[tokio::main]
 async fn main() {
     let temp_dir = TempDir::new().unwrap();
@@ -12,29 +26,94 @@ async fn main() {
         .unwrap()
         .child("log");
 
-    let mut logger = Options::new(path.clone()).build::<u8>().await.unwrap();
-    logger.write(&1).await.unwrap();
-    logger.write_batch([2, 3, 4].into_iter()).await.unwrap();
-    logger
-        .write_batch([2, 3, 4, 5, 1, 255].into_iter())
-        .await
-        .unwrap();
+    let mut logger = Options::new(path).build::<User>().await.unwrap();
+    logger.write(&User {id: 1, name: "fusio-log".to_string(), None}).await.unwrap();
+    logger.write_batch([
+        User {id: 2, name: "fusio".to_string(), "contact@tonbo.io"}
+        User {id: 3, name: "tonbo".to_string(), None}
+    ].into_iter()).await.unwrap();
 
     logger.flush().await.unwrap();
     logger.close().await.unwrap();
 
-    let expected = [vec![1], vec![2, 3, 4], vec![2, 3, 4, 5, 1, 255]];
-    let stream = Options::new(path)
-        .recover::<u8>()
-        .await
-        .unwrap()
-        .into_stream();
-    pin!(stream);
-    let mut i = 0;
-    while let Some(res) = stream.next().await {
-        assert!(res.is_ok());
-        assert_eq!(&expected[i], &res.unwrap());
-        i += 1;
+}
+```
+
+Recover from log file:
+```rust
+let stream = Options::new(path)
+    .recover::<User>()
+    .await
+    .unwrap();
+while let Ok(users) = stream.try_next().await {
+    match users {
+        Some(users) => {
+            for user in users {
+                println("{}" user.id)
+            }
+        };
+        None => println();
     }
 }
+```
+
+### Use with S3
+```rust
+
+let path = Path::from_url_path("log").unwrap();
+let option = Options::new(path).fs(FsOptions::S3 {
+    bucket: "data".to_string(),
+    credential: Some(fusio::remotes::aws::AwsCredential {
+        key_id: "key_id".to_string(),
+        secret_key: "secret_key".to_string(),
+        token: None,
+    }),
+    endpoint: None,
+    region: Some("region".to_string()),
+    sign_payload: None,
+    checksum: None,
+});
+
+let mut logger = option.build::<User>().await.unwrap();
+logger
+    .write(&User {
+        id: 100,
+        name: "Name".to_string(),
+        email: None,
+    })
+    .await
+    .unwrap();
+```
+
+### Use in Wasm
+
+Please make sure disable default features and enable `web` feature.
+
+```toml
+fusio-log = {git = "https://github.com/tonbo-io/fusio-log", default-features = false, features = ["bytes", "web"]}
+```
+
+Then, use `Path::from_opfs_path` to replace `Path::from_filesystem_path`
+```rust
+let temp_dir = TempDir::new().unwrap();
+let path = Path::from_opfs_path(temp_dir.path())
+    .unwrap()
+    .child("log");
+
+let mut logger = Options::new(path).build::<User>().await.unwrap();
+logger.write(&User {id: 1, name: "fusio-log".to_string(), None}).await.unwrap();
+```
+
+## Build
+### Build in Rust
+```sh
+cargo build
+```
+
+### Build in Wasm
+
+Build with [wasm-pack](https://github.com/rustwasm/wasm-pack)
+
+```sh
+wasm-pack build --no-default-features --features web,bytes
 ```
