@@ -28,7 +28,10 @@ where
     pub(crate) async fn new(option: Options) -> Result<Self, LogError> {
         let fs = option.fs_option.parse().map_err(parse_fusio_error)?;
         let file = fs
-            .open_options(&option.path, OpenOptions::default().create(true))
+            .open_options(
+                &option.path,
+                OpenOptions::default().read(true).write(true).create(true),
+            )
             .await
             .map_err(parse_fusio_error)?;
 
@@ -43,7 +46,10 @@ where
 
     pub(crate) async fn with_fs(fs: Arc<dyn DynFs>, option: Options) -> Result<Self, LogError> {
         let file = fs
-            .open_options(&option.path, OpenOptions::default().create(true).read(true))
+            .open_options(
+                &option.path,
+                OpenOptions::default().read(true).write(true).create(true),
+            )
             .await
             .map_err(parse_fusio_error)?;
 
@@ -262,6 +268,7 @@ mod tests {
                 assert_eq!(&expected[i], &res.unwrap());
                 i += 1;
             }
+            assert_eq!(i, expected.len())
         }
     }
 
@@ -313,6 +320,7 @@ mod tests {
                 }
                 i += 1;
             }
+            assert_eq!(i, expected.len())
         }
     }
 
