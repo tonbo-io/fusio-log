@@ -19,12 +19,12 @@ web-http = ["fusio/wasm-http"]
 async-stream = "0.3"
 bytes = { version = "1.7", optional = true }
 crc32fast = "1"
-fusio = { version = "0.3.4", features = [
+fusio = { git = "https://github.com/tonbo-io/fusio", rev = "c0db1654de692dfdf2f17efd5a0492b99cb026fc", version = "0.3.4", package = "fusio", features = [
     "dyn",
     "fs",
     "bytes"
 ] }
-fusio-dispatch = "0.3.4"
+fusio-dispatch = { git = "https://github.com/tonbo-io/fusio", rev = "c0db1654de692dfdf2f17efd5a0492b99cb026fc", version = "0.3.4", package = "fusio-dispatch" }
 futures-core = "0.3"
 futures-util = "0.3"
 
