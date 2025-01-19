@@ -8,6 +8,7 @@ pub(crate) mod option;
 mod string;
 
 use std::future::Future;
+
 use thiserror::Error;
 
 use crate::fs::{MaybeSend, SeqRead, Write};

@@ -4,7 +4,7 @@ mod option;
 mod serdes;
 use std::{io::Cursor, marker::PhantomData, sync::Arc};
 
-use error::{parse_fusio_error, LogError};
+use error::LogError;
 use fs::hash::{HashReader, HashWriter};
 pub use fusio::path::Path;
 use fusio::{buffered::BufWriter, dynamic::DynFile, fs::OpenOptions, DynFs, DynWrite};
@@ -26,14 +26,13 @@ where
     T: Encode,
 {
     pub(crate) async fn new(option: Options) -> Result<Self, LogError> {
-        let fs = option.fs_option.parse().map_err(parse_fusio_error)?;
+        let fs = option.fs_option.parse()?;
         let file = fs
             .open_options(
                 &option.path,
                 OpenOptions::default().read(true).write(true).create(true),
             )
-            .await
-            .map_err(parse_fusio_error)?;
+            .await?;
 
         let buf_writer = BufWriter::new(file, option.buf_size);
         Ok(Self {
@@ -50,8 +49,7 @@ where
                 &option.path,
                 OpenOptions::default().read(true).write(true).create(true),
             )
-            .await
-            .map_err(parse_fusio_error)?;
+            .await?;
 
         let buf_writer = BufWriter::new(file, option.buf_size);
         Ok(Self {
@@ -72,10 +70,7 @@ where
         data: impl ExactSizeIterator<Item = &'r T>,
     ) -> Result<(), LogError> {
         let mut writer = HashWriter::new(&mut self.buf_writer);
-        (data.len() as u32)
-            .encode(&mut writer)
-            .await
-            .map_err(parse_fusio_error)?;
+        (data.len() as u32).encode(&mut writer).await?;
         for e in data {
             e.encode(&mut writer)
                 .await
@@ -83,7 +78,7 @@ where
                     message: err.to_string(),
                 })?;
         }
-        writer.eol().await.map_err(parse_fusio_error)?;
+        writer.eol().await?;
         Ok(())
     }
 
@@ -96,17 +91,17 @@ where
             .map_err(|err| LogError::Encode {
                 message: err.to_string(),
             })?;
-        writer.eol().await.map_err(parse_fusio_error)?;
+        writer.eol().await?;
         Ok(())
     }
 
     pub async fn flush(&mut self) -> Result<(), LogError> {
-        self.buf_writer.flush().await.map_err(parse_fusio_error)?;
+        self.buf_writer.flush().await?;
         Ok(())
     }
 
     pub async fn close(&mut self) -> Result<(), LogError> {
-        self.buf_writer.close().await.map_err(parse_fusio_error)?;
+        self.buf_writer.close().await?;
         Ok(())
     }
 }
@@ -118,11 +113,10 @@ where
     pub(crate) async fn recover(
         option: Options,
     ) -> Result<impl TryStream<Ok = Vec<T>, Error = LogError> + Unpin, LogError> {
-        let fs = option.fs_option.parse().map_err(parse_fusio_error)?;
+        let fs = option.fs_option.parse()?;
         let file = fs
             .open_options(&option.path, OpenOptions::default().create(false))
-            .await
-            .map_err(parse_fusio_error)?;
+            .await?;
 
         Ok(Box::pin(stream::try_unfold(
             (file, 0),
@@ -164,10 +158,7 @@ where
 impl<T> Logger<T> {
     /// Remove log file
     pub async fn remove(self) -> Result<(), LogError> {
-        self.fs
-            .remove(&self.path)
-            .await
-            .map_err(parse_fusio_error)?;
+        self.fs.remove(&self.path).await?;
         Ok(())
     }
 }
@@ -175,15 +166,14 @@ impl<T> Logger<T> {
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        fs::{SeqRead, Write},
-        FsOptions, Path,
-    };
     use futures_util::{StreamExt, TryStreamExt};
     use tempfile::TempDir;
     use tokio::pin;
 
-    use crate::{Decode, Encode, Options};
+    use crate::{
+        fs::{SeqRead, Write},
+        Decode, Encode, FsOptions, Options, Path,
+    };
 
     #[derive(Debug, Clone)]
     struct TestStruct {
