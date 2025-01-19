@@ -1,7 +1,12 @@
 
 # Fusio Log
-Fusio-log is an append only log library for Rust. Leveraging [fusio](https://github.com/tonbo-io/fusio), fusio-log supports various backends like disk, wasm, and S3.
-You can use it in various scenarios that, such as [write-ahead logging](https://en.wikipedia.org/wiki/Write-ahead_logging), [manifest file](https://en.wikipedia.org/wiki/Manifest_file), distributed log.
+`fusio-log` is an append-only log library for Rust. Leveraging [fusio](https://github.com/tonbo-io/fusio), `fusio-log` supports various backends like disk, wasm, and S3.
+
+For those unfamiliar with the database, the key difference between `fusio-log` and other "logging" crates is that `fusio-log` not only supports writing logs through the `write` and `write_batch` methods, but also allows reading logs via the `recover` method.
+
+This crate is designed to build database components like [write-ahead logging](https://en.wikipedia.org/wiki/Write-ahead_logging) or metadata storage, `fusio-log` supports transactional write/read via `write_batch`, ensuring that logs in the same batch are recovered together.
+
+For further more, please read https://datatechnologytoday.wordpress.com/2014/02/10/the-log-is-the-database/.
 
 
 ## Usage
@@ -15,8 +20,8 @@ struct User {
 }
 ```
 
-2. Implement `Encode` and `Decode` trait for it
-3. Start to use fusio-log
+2. Implement `Encode` and `Decode` trait for it.
+3. Start to use fusio-log.
 
 ```rust
 #[tokio::main]
