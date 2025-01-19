@@ -68,9 +68,12 @@ where
     T: Encode,
 {
     pub async fn write_batch<'r>(
-        &'r mut self,
+        &mut self,
         data: impl ExactSizeIterator<Item = &'r T>,
-    ) -> Result<(), LogError> {
+    ) -> Result<(), LogError>
+    where
+        T: 'r,
+    {
         let mut writer = HashWriter::new(&mut self.buf_writer);
         (data.len() as u32)
             .encode(&mut writer)
