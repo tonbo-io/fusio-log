@@ -3,7 +3,7 @@ use std::{future::Future, hash::Hasher};
 use fusio::{Error, IoBuf, IoBufMut, MaybeSend, SeqRead, Write};
 
 use crate::{
-    error::{parse_fusio_error, LogError},
+    error::LogError,
     serdes::{Decode, Encode},
 };
 
@@ -59,9 +59,7 @@ impl<R: SeqRead> HashReader<R> {
     }
 
     pub(crate) async fn checksum(mut self) -> Result<bool, LogError> {
-        let checksum = u32::decode(&mut self.reader)
-            .await
-            .map_err(parse_fusio_error)?;
+        let checksum = u32::decode(&mut self.reader).await?;
 
         self.pos += size_of::<u32>() as u64;
         Ok(self.hasher.finalize() == checksum)
