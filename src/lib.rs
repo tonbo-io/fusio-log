@@ -55,7 +55,7 @@ where
 
         let buf_writer = BufWriter::new(file, option.buf_size);
         Ok(Self {
-            fs: fs.clone(),
+            fs,
             buf_writer,
             path: option.path,
             _mark: PhantomData,
